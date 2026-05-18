@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SSE test</title>
+    <style>
+      #dataContainer {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+        max-width: 500px;
+      }
+      .log-area {
+        margin-top: 10px;
+        font-family: monospace;
+        font-size: 12px;
+        color: #555;
+        background: #eee;
+        padding: 10px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+      .user-item {
+        padding: 6px;
+        border-bottom: 1px solid #eee;
+        list-style: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <button id="startBtn" onclick="startConnection()">SSE 시작</button>
+      <button id="closeBtn" onclick="closeConnection()" disabled>강제 종료</button>
+    </div>
+
+    <!-- 데이터를 표시할 영역 -->
+    <div id="dataContainer">
+      <h3>수신된 사용자 목록</h3>
+      <ul id="userList" style="padding: 0;"></ul>
+      <div id="statusMessage" style="font-weight: bold; color: #0066cc;">연결 대기 중...</div>
+    </div>
+
+    <!-- 콘솔 대신 화면에 로그를 찍어줄 영역 -->
+    <div class="log-area" id="logArea"></div>
+
+    <script>
+      let eventSource = null;
+      const userList = document.getElementById("userList");
+      const statusMessage = document.getElementById("statusMessage");
+      const logArea = document.getElementById("logArea");
+
+      function appendLog(message) {
+        const logLine = document.createElement("div");
+        logLine.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logArea.appendChild(logLine);
+        logArea.scrollTop = logArea.scrollHeight;
+      }
+
+      function startConnection() {
+        if (eventSource !== null) {
+          appendLog("이미 연결이 진행 중입니다.");
+          return;
+        }
+
+        // 기존 데이터 초기화
+        userList.innerHTML = "";
+        logArea.innerHTML = "";
+        statusMessage.textContent = "연결 시도 중...";
+        statusMessage.style.color = "#0066cc";
+
+        eventSource = new EventSource("http://localhost:8080/api/users");
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("closeBtn").disabled = false;
+
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          appendLog(`기본 메시지 수신: ${event.data}`);
+        };
+
+        eventSource.addEventListener("usersevent", (event) => {
+          appendLog(`usersevent 수신 (ID: ${event.lastEventId})`);
+          
+          const user = JSON.parse(event.data);
+          
+          // 화면에 유저 정보 노드 추가
+          const li = document.createElement("li");
+          li.className = "user-item";
+          li.textContent = `🆔 ID: ${event.lastEventId} | 👤 Name: ${user.name || user}`;
+          userList.appendChild(li);
+        });
+
+        eventSource.addEventListener("complete", (event) => {
+          appendLog("서버로부터 스트림 완결 신호를 수신했습니다.");
+          statusMessage.textContent = "스트림 전송 완료 (정상 종료)";
+          statusMessage.style.color = "#28a745";
+          closeConnection();
+        });
+
+        eventSource.onopen = () => {
+          appendLog("SSE 스트림 연결이 성공적으로 수립되었습니다.");
+          statusMessage.textContent = "연결됨 (데이터 수신 중...)";
+          statusMessage.style.color = "#28a745";
+        };
+
+        eventSource.onerror = (error) => {
+          if (eventSource.readyState === EventSource.CLOSED) {
+            appendLog("연결이 완전히 닫혔습니다.");
+            if (statusMessage.textContent.indexOf("완료") === -1) {
+              statusMessage.textContent = "연결 종료";
+              statusMessage.style.color = "#6c757d";
+            }
+            resetButtonState();
+            eventSource = null;
+            return;
+          }
+
+          appendLog("SSE 연결 오류 발생");
+          statusMessage.textContent = "연결 오류 발생";
+          statusMessage.style.color = "#dc3545";
+
+          if (eventSource.readyState === EventSource.CONNECTING) {
+            statusMessage.textContent = "재연결 시도 중...";
+            statusMessage.style.color = "#ffc107";
+            appendLog("재연결을 시도 중입니다...");
+          }
+        };
+      }
+
+      function closeConnection() {
+        if (eventSource) {
+          eventSource.close();
+          appendLog("클라이언트가 명시적으로 SSE 연결을 종료했습니다.");
+          if (statusMessage.textContent.indexOf("완료") === -1) {
+            statusMessage.textContent = "사용자에 의해 종료됨";
+            statusMessage.style.color = "#6c757d";
+          }
+          resetButtonState();
+          eventSource = null;
+        }
+      }
+
+      function resetButtonState() {
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("closeBtn").disabled = true;
+      }
+    </script>
+  </body>
+</html>
