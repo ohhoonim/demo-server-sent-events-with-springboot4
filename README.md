@@ -1,46 +1,42 @@
-# demo-server-sent-events-with-springboot4
-spring boot 4에서 SSE 구현
+# SpringBoot에서 Server-Sent Events 구현하기
 
-## 핵심 개념
+### 구현 사양
 
-- HTTP 기반: 기존 HTTP 연결을 유지하면서 서버가 데이터를 계속 전송.
-- 단방향 통신: 서버 → 클라이언트 방향만 지원 (클라이언트 → 서버는 일반 요청 사용).
-- 텍스트 이벤트 스트림: MIME 타입은 text/event-stream.
-- 자동 재연결: 브라우저가 연결이 끊어지면 자동으로 다시 연결 시도.
+- OpenJDK 25
+- Springboot 4
+- WebMvc.Fn
+- VanillaJs
+- 5-step architecture
 
-## 사용 사례
+## Server-Sent Events 란
 
-- 실시간 알림(Notification)
-- 주식 시세 업데이트
-- 채팅 메시지 스트림 (읽기 전용)
-- IoT 센서 데이터 모니터링
+WHATWG의 Server-Sent Events(SSE) 명세는 서버가 단방향으로 클라이언트(브라우저)에게 실시간 이벤트를 푸시할 수 있도록 지원하는 웹 표준 명세입니다. WebSockets와 달리 전통적인 **HTTP 프로토콜(주로 HTTP/1.1 Persistent Connection 또는 HTTP/2, HTTP/3 Multiplexing)** 위에서 동작하므로, 프록시나 방화벽 환경에 친화적이며 추가적인 가상 프로토콜 레이어가 필요하지 않습니다.
+
+클라이언트 브라우저는 명세에 기술된 `EventSource` 인터페이스를 구현하여 서버와 지속적인 스트림 연결을 맺습니다.
+
+## SSE 활용 범위
+
+1. AI 응답 실시간 스트리밍 (LLM Streaming)
+2. 실시간 알림 및 푸시 알림 (Notification System)
+3. 실시간 모니터링 및 대시보드 (Real-time Dashboards)
+4. 실시간 피드 및 콘텐츠 업데이트 (Live Feeds)
+5. 대용량 작업 진행률 추적 (Background Job Progress)
 
 
-## 코드 예
+## 테스트 해보는 법
 
-```java
+- 터미널에서 다음의 명령어를 실행하거나, IDE에서 스프링부트 애플리케이션 실행
 
-@RestController
-public class SseMvcController {
-
-    @GetMapping("/sse-mvc")
-    public SseEmitter handleSse() {
-        // 기본 타임아웃: 30초 (필요시 조정 가능)
-        SseEmitter emitter = new SseEmitter(30_000L);
-
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(() -> {
-            try {
-                String data = "Current time: " + LocalTime.now();
-                emitter.send(SseEmitter.event()
-                        .id(String.valueOf(System.currentTimeMillis()))
-                        .name("time-event")
-                        .data(data));
-            } catch (IOException e) {
-                emitter.completeWithError(e);
-            }
-        }, 0, 1, TimeUnit.SECONDS);
-
-        return emitter;
-    }
-}
+```sh
+$ ./gradlew bootRun
 ```
+
+- 브라우저에서 http://localhost:8080/index.html 로 접속
+- 'sse접속' 버튼을 클릭하면 1초 단위로 데이터가 나타남. 
+
+![](image.png)
+
+## 주요 코드 
+
+- src/main/java/dev/ohhoonim/user/endpoint/UserRouter.java
+- src/main/resources/static/index.html

@@ -2,7 +2,6 @@ package dev.ohhoonim.user.endpoint;
 
 import static org.springframework.web.servlet.function.ServerResponse.ok;
 import static org.springframework.web.servlet.function.ServerResponse.sse;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -29,8 +28,10 @@ public class UserRouter implements Supplier<RouterFunction<ServerResponse>> {
     @Bean
     public RouterFunction<ServerResponse> get() {
         return RouterFunctions.route().path("/api/users",
-                builder -> builder.GET("", handler.getAllUsers).POST("", handler.createUser)
-                        .GET("/{id}", handler.getUserById).DELETE("/{id}", handler.deleteUser))
+                builder -> builder.GET("", handler.getAllUsers)
+                        .POST("", handler.createUser)
+                        .GET("/{id}", handler.getUserById)
+                        .DELETE("/{id}", handler.deleteUser))
                 .build();
     }
 
@@ -45,18 +46,16 @@ public class UserRouter implements Supplier<RouterFunction<ServerResponse>> {
         public UserHandlers(UserService userService, ObjectMapper objectMapper) {
             this.getAllUsers = req -> {
                 List<User> users = userService.findAll();
-                AtomicInteger idx = new AtomicInteger(0);
                 return sse(sse -> {
                     try {
-                        // stream().forEach 대신 명시적인 for 루프를 사용하여 자원 제어력 확보
+                        AtomicInteger idx = new AtomicInteger(0);
                         for (User u : users) {
-                            // 스레드가 이미 인터럽트 되었거나 닫혔는지 사전 검증
                             if (Thread.currentThread().isInterrupted()) {
                                 break;
                             }
-
-                            sse.id(String.valueOf(idx.incrementAndGet())).event("usersevent")
-                                    .send(objectMapper.writeValueAsString(u));
+                            sse.id(String.valueOf(idx.incrementAndGet()))
+                                .event("usersevent")
+                                .send(objectMapper.writeValueAsString(u));
 
                             Thread.sleep(1000);
                         }
@@ -83,7 +82,6 @@ public class UserRouter implements Supplier<RouterFunction<ServerResponse>> {
                 return ServerResponse.status(201).body(user);
             };
             this.deleteUser = req -> {
-
                 int id = Integer.parseInt(req.pathVariable("id"));
                 userService.delete(id);
                 return ServerResponse.noContent().build();
