@@ -2,6 +2,9 @@ package dev.ohhoonim.user.endpoint;
 
 import static org.springframework.web.servlet.function.ServerResponse.ok;
 import static org.springframework.web.servlet.function.ServerResponse.sse;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -60,6 +63,7 @@ public class UserRouter implements Supplier<RouterFunction<ServerResponse>> {
                             Thread.sleep(1000);
                         }
                         sse.event("complete").send("stream-finished");
+                        sse.retry(Duration.of(10, ChronoUnit.SECONDS));
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         sse.onError(
@@ -67,9 +71,8 @@ public class UserRouter implements Supplier<RouterFunction<ServerResponse>> {
                     } catch (Exception e) {
                         sse.onError(err -> new RuntimeException("Stream logic failure", e));
                     } finally {
-                        // 반드시 스트림을 완결시키고 콜백을 비워 톰캣 리사이클 유효성 검증을 통과시킴
                         sse.onComplete(() -> IO.println("전송 완료"));
-                        sse.complete();
+                        // sse.complete();
                     }
                 });
             };
